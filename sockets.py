@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-# Copyright (c) 2013-2014 Abram Hindle
+# Copyright (c) 2013-2014 Abram Hindle, Matthew Dekinder
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,8 +14,9 @@
 # limitations under the License.
 #
 import flask
-from flask import Flask, request
+from flask import Flask, request, redirect
 from flask_sockets import Sockets
+from flask_cors import CORS, cross_origin
 import gevent
 from gevent import queue
 import time
@@ -25,6 +26,7 @@ import os
 app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
+CORS(app)
 
 class World:
     def __init__(self):
@@ -49,6 +51,14 @@ class World:
         '''update the set listeners'''
         for listener in self.listeners:
             listener(entity, self.get(entity))
+        print "updating listeners"
+        print entity
+        obj = {}
+        obj["entity"] = entity
+        obj["data"] = self.get(entity)
+        msg = json.dumps(obj)
+        print "message: "+msg
+        sendall_ws(msg)
 
     def clear(self):
         self.space = dict()
@@ -59,7 +69,19 @@ class World:
     def world(self):
         return self.space
 
-myWorld = World()        
+myWorld = World()
+clients = list()
+
+#https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
 
 def set_listener( entity, data ):
     ''' do something with the update ! '''
@@ -69,19 +91,62 @@ myWorld.add_set_listener( set_listener )
 @app.route('/')
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return redirect('/static/index.html')
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
-    return None
+    #Adapted from https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py 
+    #By Abram Hindle under the Apache 2 Licence
+    try:
+        while True:
+            msg = ws.receive()
+            print "WS RECV: %s" % msg
+            if (msg is not None):
+                packet = json.loads(msg)
+                
+                if (packet["method"] == "update"):
+                    #print packet["entity"], packet["data"]
+                    myWorld.set(packet["entity"],packet["data"] ) #update the world. This should now be sent to each listener
+                elif (packet["method"] == "init_world"): 
+                    for key in myWorld.world():
+                        myWorld.update_listeners(key)
+                
+            else:
+                print "breaking (null message through ws)"
+                break
+    except:
+        print "exception resulting while monitoring the websocket"
+        '''Done'''
+
+def sendall_ws(msg):
+    #Adapted from https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py 
+    for client in clients:
+        client.put( msg )
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
     # XXX: TODO IMPLEMENT ME
-    return None
+    #https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py
+    client = Client()
+    clients.append(client) #shouldn't I be setting this as a listener?
+    #add_set_listener(client)
+    g = gevent.spawn( read_ws, ws, client )  
+    print "Subscribing"
+    try:
+        while True:
+            # block here
+            msg = client.get()
+            #print "Got a message!"
+            ws.send(msg)
+    except Exception as e:# WebSocketError as e:
+        print "WS Error %s" % e
+    finally:
+        clients.remove(client) #this needs to remove the listener
+        gevent.kill(g)
+
 
 
 def flask_post_json():
@@ -94,26 +159,32 @@ def flask_post_json():
     else:
         return json.loads(request.form.keys()[0])
 
+
+#These routes are adapted from my assignemnt 4. 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
+@cross_origin(origin='*',headers=['Content-Type','Authorization'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    myWorld.set(entity, flask_post_json()) #TODO: get the data for this method
+
+    #http://stackoverflow.com/questions/26079754/flask-how-to-return-a-success-status-code-for-ajax-call
+    return jsonify(myWorld.get(entity));
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    return jsonify(myWorld.world())
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
-
+    return jsonify(myWorld.get(entity))
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    return jsonify(myWorld.world())
 
 
 
