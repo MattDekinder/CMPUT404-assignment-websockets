@@ -54,8 +54,11 @@ class World:
         print "updating listeners"
         print entity
         obj = {}
-        obj["entity"] = entity
-        obj["data"] = self.get(entity)
+        #obj["entity"] = entity
+        #obj["data"] = self.get(entity)
+        print "here"
+        obj[entity] = self.get(entity)
+
         msg = json.dumps(obj)
         print "message: "+msg
         sendall_ws(msg)
@@ -105,12 +108,16 @@ def read_ws(ws,client):
             if (msg is not None):
                 packet = json.loads(msg)
                 
-                if (packet["method"] == "update"):
-                    #print packet["entity"], packet["data"]
-                    myWorld.set(packet["entity"],packet["data"] ) #update the world. This should now be sent to each listener
-                elif (packet["method"] == "init_world"): 
-                    for key in myWorld.world():
-                        myWorld.update_listeners(key)
+                for key in packet:
+                    myWorld.set(key, packet[key])
+
+                #This works but is not what the test expects
+                #if (packet["method"] == "update"):
+                #    #print packet["entity"], packet["data"]
+                #    myWorld.set(packet["entity"],packet["data"] ) #update the world. This should now be sent to each listener
+                #elif (packet["method"] == "init_world"): 
+                #    for key in myWorld.world():
+                #        myWorld.update_listeners(key)
                 
             else:
                 print "breaking (null message through ws)"

@@ -130,11 +130,15 @@ function addEntity(entity, data) {
     //world[entity] = data;
     //adrawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
-    var obj = {
+
+    //removed to pass the test
+    /*var obj = {
         "method": "update",
         "entity": entity,
         "data" : data
-    };
+    };*/
+    
+    var obj = {entity: data};
     var sendObj = JSON.stringify(obj)
     socket.send(sendObj);
 
@@ -267,12 +271,12 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
-        //gotta ask for the world, I think.
-        var obj = {
+        //Asking for the world. This isn't what the test expects though.
+       /* var obj = {
         "method": "init_world"
         };
         var sendObj = JSON.stringify(obj)
-        socket.send(sendObj);
+        socket.send(sendObj); */
 
     };
     socket.onerror = function(msg) {
@@ -283,7 +287,11 @@ function wsSetup() {
             debug("WebSocket Recv:" + msg.data);
             //XXX: TODO What are you going to do here?
             obj = JSON.parse(msg.data);
-            world[obj.entity]= obj.data;
+            for (var key in obj){
+                world[key] = obj[key];
+            }
+
+           // world[obj.entity]= obj.data;
             drawNextFrame();
 
         } catch (e) {
