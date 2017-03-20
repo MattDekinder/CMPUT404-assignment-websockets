@@ -86,10 +86,13 @@ function clearFrame() {
 // This actually draws the frame
 function renderFrame() {
     clearFrame();
+    var l = 0;
     for (var key in world) {
         var entity = world[key];
         drawCircle(context,prepEntity(entity));
+        l++;
     }
+    debug(l);
 }
 
 var drawNext = true;
@@ -137,8 +140,8 @@ function addEntity(entity, data) {
         "entity": entity,
         "data" : data
     };*/
-    
-    var obj = {entity: data};
+    var obj = {};
+    obj[entity]= data;
     var sendObj = JSON.stringify(obj)
     socket.send(sendObj);
 
@@ -265,6 +268,9 @@ function update() {
     drawFrame();
 }
 
+function update_world(key, data){
+    world[key] = data;
+}
 
 function wsSetup() {
     var url = "ws://"+host+"/subscribe";   
@@ -287,8 +293,9 @@ function wsSetup() {
             debug("WebSocket Recv:" + msg.data);
             //XXX: TODO What are you going to do here?
             obj = JSON.parse(msg.data);
+            //http://stackoverflow.com/questions/728360/how-do-i-correctly-clone-a-javascript-object
             for (var key in obj){
-                world[key] = obj[key];
+                update_world(key,obj[key]) //TODO TODO: this is some nasty copy by refence shit
             }
 
            // world[obj.entity]= obj.data;
