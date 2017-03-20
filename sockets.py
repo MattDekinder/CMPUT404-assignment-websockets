@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 import flask
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, jsonify
 from flask_sockets import Sockets
 from flask_cors import CORS, cross_origin
 import gevent
