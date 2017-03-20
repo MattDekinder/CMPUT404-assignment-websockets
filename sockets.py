@@ -128,6 +128,7 @@ def read_ws(ws,client):
 
 def sendall_ws(msg):
     #Adapted from https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py 
+    #By Abram Hindle under the Apache 2 Licence
     for client in clients:
         client.put( msg )
 
@@ -143,6 +144,10 @@ def subscribe_socket(ws):
     g = gevent.spawn( read_ws, ws, client )  
     print "Subscribing"
     try:
+        #send initial state
+        state = myWorld.world()
+        init_world = json.dumps(state)
+        ws.send(init_world)
         while True:
             # block here
             msg = client.get()
